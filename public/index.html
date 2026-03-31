@@ -12,26 +12,22 @@
       padding: 20px;
       background: #f7f7f7;
     }
-
     .card {
       background: white;
       border-radius: 10px;
       padding: 20px;
       margin-bottom: 20px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
-
     input, select, button {
       padding: 10px;
       margin: 5px 0;
       width: 100%;
       box-sizing: border-box;
     }
-
     button {
       cursor: pointer;
     }
-
     .device {
       border: 1px solid #ddd;
       border-radius: 8px;
@@ -39,19 +35,8 @@
       margin-top: 10px;
       background: #fafafa;
     }
-
     .hidden {
       display: none;
-    }
-
-    .error {
-      color: red;
-      margin-top: 10px;
-    }
-
-    .success {
-      color: green;
-      margin-top: 10px;
     }
   </style>
 </head>
@@ -76,7 +61,6 @@
     <input id="deviceName" placeholder="Device name" />
     <input id="deviceDescription" placeholder="Device description" />
     <button onclick="addDevice()">Add Device</button>
-    <p id="deviceMessage"></p>
   </div>
 
   <div class="card hidden" id="devicesCard">
@@ -89,185 +73,92 @@
     let currentUser = null;
 
     async function login() {
-      const email = document.getElementById('email').value.trim();
+      const email = document.getElementById('email').value;
       const password = document.getElementById('password').value;
       const message = document.getElementById('loginMessage');
 
-      message.textContent = '';
-      message.className = '';
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
 
-      try {
-        const response = await fetch('/api/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
-        });
+      const data = await response.json();
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          message.textContent = data.message || 'Login failed';
-          message.className = 'error';
-          return;
-        }
-
-        currentUser = data.user;
-        message.textContent = 'Login successful';
-        message.className = 'success';
-
-        document.getElementById('userCard').classList.remove('hidden');
-        document.getElementById('devicesCard').classList.remove('hidden');
-        document.getElementById('userInfo').textContent = `${currentUser.email} (${currentUser.role})`;
-
-        if (currentUser.role === 'admin') {
-          document.getElementById('adminCard').classList.remove('hidden');
-        }
-
-        await loadDevices();
-      } catch (error) {
-        message.textContent = 'Server error during login';
-        message.className = 'error';
-        console.error('Login error:', error);
+      if (!response.ok) {
+        message.textContent = data.message;
+        return;
       }
+
+      currentUser = data.user;
+      message.textContent = 'Login successful';
+      document.getElementById('userCard').classList.remove('hidden');
+      document.getElementById('devicesCard').classList.remove('hidden');
+      document.getElementById('userInfo').textContent = `${currentUser.email} (${currentUser.role})`;
+
+      if (currentUser.role === 'admin') {
+        document.getElementById('adminCard').classList.remove('hidden');
+      }
+
+      loadDevices();
     }
 
     async function loadDevices() {
+      const response = await fetch('/api/devices');
+      const devices = await response.json();
       const list = document.getElementById('devicesList');
-      list.innerHTML = '<p>Loading...</p>';
+      list.innerHTML = '';
 
-      try {
-        const response = await fetch('/api/devices');
-        const data = await response.json();
-
-        if (!response.ok) {
-          list.innerHTML = `<p class="error">${data.message || 'Failed to load devices'}</p>`;
-          return;
-        }
-
-        const devices = Array.isArray(data) ? data : (data.items || []);
-        list.innerHTML = '';
-
-        if (devices.length === 0) {
-          list.innerHTML = '<p>No devices found.</p>';
-          return;
-        }
-
-        devices.forEach(device => {
-          const div = document.createElement('div');
-          div.className = 'device';
-
+      devices.forEach(device => {
+        const div = document.createElement('div');
+        div.className = 'device';
           div.innerHTML = `
-            <strong>${device.name || ''}</strong><br>
-            ${device.description || ''}<br>
-            Status: <b>${device.status || ''}</b><br><br>
-
+            <strong>${device.name}</strong><br>
+            ${device.description}<br>
+            Status: <b>${device.status}</b><br><br>
             <select id="status-${device.id}">
               <option value="available" ${device.status === 'available' ? 'selected' : ''}>available</option>
               <option value="in_use" ${device.status === 'in_use' ? 'selected' : ''}>in_use</option>
             </select>
-
             <button onclick="updateStatus('${device.id}')">Update status</button>
-            ${currentUser && currentUser.role === 'admin'
-              ? `<button onclick="deleteDevice('${device.id}')">Delete</button>`
-              : ''}
+            ${currentUser && currentUser.role === 'admin' ? `<button onclick="deleteDevice('${device.id}')">Delete</button>` : ''}
           `;
-
-          list.appendChild(div);
-        });
-      } catch (error) {
-        list.innerHTML = '<p class="error">Server error while loading devices</p>';
-        console.error('Load devices error:', error);
-      }
+        list.appendChild(div);
+      });
     }
 
     async function addDevice() {
-      const name = document.getElementById('deviceName').value.trim();
-      const description = document.getElementById('deviceDescription').value.trim();
-      const message = document.getElementById('deviceMessage');
+      const name = document.getElementById('deviceName').value;
+      const description = document.getElementById('deviceDescription').value;
 
-      message.textContent = '';
-      message.className = '';
+      const response = await fetch('/api/devices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description })
+      });
 
-      if (!name || !description) {
-        message.textContent = 'Fill in all fields';
-        message.className = 'error';
-        return;
-      }
-
-      try {
-        const response = await fetch('/api/devices', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, description })
-        });
-
-        const data = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-          message.textContent = data.message || 'Failed to add device';
-          message.className = 'error';
-          console.error('Add device error:', data);
-          return;
-        }
-
+      if (response.ok) {
         document.getElementById('deviceName').value = '';
         document.getElementById('deviceDescription').value = '';
-        message.textContent = 'Device added successfully';
-        message.className = 'success';
-
-        await loadDevices();
-      } catch (error) {
-        message.textContent = 'Server error while adding device';
-        message.className = 'error';
-        console.error('Add device error:', error);
+        loadDevices();
       }
     }
 
     async function updateStatus(id) {
       const status = document.getElementById(`status-${id}`).value;
-
-      try {
-        const response = await fetch(`/api/devices/${id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status })
-        });
-
-        const data = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-          alert(data.message || 'Failed to update status');
-          console.error('Update status error:', data);
-          return;
-        }
-
-        await loadDevices();
-      } catch (error) {
-        alert('Server error while updating status');
-        console.error('Update status error:', error);
-      }
+      await fetch(`/api/devices/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      loadDevices();
     }
 
     async function deleteDevice(id) {
-      try {
-        const response = await fetch(`/api/devices/${id}`, {
-          method: 'DELETE'
-        });
-
-        const data = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-          alert(data.message || 'Failed to delete device');
-          console.error('Delete device error:', data);
-          return;
-        }
-
-        await loadDevices();
-      } catch (error) {
-        alert('Server error while deleting device');
-        console.error('Delete device error:', error);
-      }
+      await fetch(`/api/devices/${id}`, { method: 'DELETE' });
+      loadDevices();
     }
   </script>
 </body>
 </html>
+
