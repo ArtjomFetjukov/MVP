@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inventory MVP</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f7f7f7;
+    }
+    .card {
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    input, select, button {
+      padding: 10px;
+      margin: 5px 0;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    button {
+      cursor: pointer;
+    }
+    .device {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 10px;
+      background: #fafafa;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Inventory SaaS MVP</h1>
+
+  <div class="card" id="loginCard">
+    <h2>Login</h2>
+    <input id="email" type="email" placeholder="Email" value="admin@test.com" />
+    <input id="password" type="password" placeholder="Password" value="1234" />
+    <button onclick="login()">Login</button>
+    <p id="loginMessage"></p>
+  </div>
+
+  <div class="card hidden" id="userCard">
+    <h2>User Info</h2>
+    <p id="userInfo"></p>
+  </div>
+
+  <div class="card hidden" id="adminCard">
+    <h2>Add Device (Admin)</h2>
+    <input id="deviceName" placeholder="Device name" />
+    <input id="deviceDescription" placeholder="Device description" />
+    <button onclick="addDevice()">Add Device</button>
+  </div>
+
+  <div class="card hidden" id="devicesCard">
+    <h2>Devices</h2>
+    <button onclick="loadDevices()">Refresh Devices</button>
+    <div id="devicesList"></div>
+  </div>
+
+  <script>
+    let currentUser = null;
+
+    async function login() {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const message = document.getElementById('loginMessage');
+
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        message.textContent = data.message;
+        return;
+      }
+
+      currentUser = data.user;
+      message.textContent = 'Login successful';
+      document.getElementById('userCard').classList.remove('hidden');
+      document.getElementById('devicesCard').classList.remove('hidden');
+      document.getElementById('userInfo').textContent = `${currentUser.email} (${currentUser.role})`;
+
+      if (currentUser.role === 'admin') {
+        document.getElementById('adminCard').classList.remove('hidden');
+      }
+
+      loadDevices();
+    }
+
+    async function loadDevices() {
+      const response = await fetch('/api/devices');
+      const devices = await response.json();
+      const list = document.getElementById('devicesList');
+      list.innerHTML = '';
+
+      devices.forEach(device => {
+        const div = document.createElement('div');
+        div.className = 'device';
+          div.innerHTML = `
+            <strong>${device.name}</strong><br>
+            ${device.description}<br>
+            Status: <b>${device.status}</b><br><br>
+            <select id="status-${device.id}">
+              <option value="available" ${device.status === 'available' ? 'selected' : ''}>available</option>
+              <option value="in_use" ${device.status === 'in_use' ? 'selected' : ''}>in_use</option>
+            </select>
+            <button onclick="updateStatus('${device.id}')">Update status</button>
+            ${currentUser && currentUser.role === 'admin' ? `<button onclick="deleteDevice('${device.id}')">Delete</button>` : ''}
+          `;
+        list.appendChild(div);
+      });
+    }
+
+    async function addDevice() {
+      const name = document.getElementById('deviceName').value;
+      const description = document.getElementById('deviceDescription').value;
+
+      const response = await fetch('/api/devices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description })
+      });
+
+      if (response.ok) {
+        document.getElementById('deviceName').value = '';
+        document.getElementById('deviceDescription').value = '';
+        loadDevices();
+      }
+    }
+
+    async function updateStatus(id) {
+      const status = document.getElementById(`status-${id}`).value;
+      await fetch(`/api/devices/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      loadDevices();
+    }
+
+    async function deleteDevice(id) {
+      await fetch(`/api/devices/${id}`, { method: 'DELETE' });
+      loadDevices();
+    }
+  </script>
+</body>
+</html>
